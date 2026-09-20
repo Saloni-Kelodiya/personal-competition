@@ -1,69 +1,215 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
-  return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
+import { useEffect, useState } from "react";
+
+import StatsCard from "@/components/dashboard/StatsCard";
+import TodayTasks from "@/components/dashboard/TodayTasks";
+import GoalOverview from "@/components/dashboard/GoalOverview";
+import FocusOverview from "@/components/dashboard/FocusOverview";
+import CareerOverview from "@/components/dashboard/CareerOverview";
+
+import { initialData } from "@/data/initialData";
+import { AppData } from "@/types";
+
+type CareerItem = {
+  category?: string;
+  skill?: string;
+  progress: number;
+  target: number;
+};
+
+export default function DashboardPage() {
+  const [data, setData] = useState<AppData>(initialData);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    async function loadDashboard() {
+      try {
+        const response = await fetch("/api/dashboard?userId=1");
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch dashboard");
+        }
+
+        const result = await response.json();
+
+        if (!result.success) {
+          throw new Error(result.error || "Dashboard API failed");
+        }
+
+        const dashboard = result.data;
+
+        const careerData: CareerItem[] = dashboard.career || [];
+
+        const codingMinutes = careerData
+          .filter((item) =>
+            item.category?.toLowerCase() === "coding"
+          )
+          .reduce(
+            (total: number, item) => total + item.progress,
+            0
+          );
+
+        const projectsCompleted = careerData.filter(
+          (item) =>
+            item.skill?.toLowerCase().includes("project") &&
+            item.progress >= item.target
+        ).length;
+
+        const skillsImproved = careerData.filter(
+          (item) => item.progress > 0
+        ).length;
+
+        const apiData: AppData = {
+          ...initialData,
+
+          stats: {
+            ...initialData.stats,
+            xp: dashboard.stats.xp,
+            level: dashboard.stats.level,
+            currentStreak: dashboard.stats.currentStreak,
+            longestStreak: dashboard.stats.longestStreak,
+            completedTasks: dashboard.stats.completedTasks,
+            totalFocusMinutes: dashboard.stats.totalFocusMinutes,
+          },
+
+          goals: dashboard.goals || [],
+
+          tasks: dashboard.recentTasks || [],
+
+          career: {
+            ...initialData.career,
+            codingMinutes,
+            projectsCompleted,
+            skillsImproved,
+          },
+        };
+
+        setData(apiData);
+      } catch (error) {
+        console.error("Dashboard loading error:", error);
+      } finally {
+        setLoaded(true);
+      }
+    }
+
+    loadDashboard();
+  }, []);
+
+  if (!loaded) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-slate-950 text-white">
+        <p className="text-slate-400">
+          Loading dashboard...
+        </p>
       </main>
-    </div>
+    );
+  }
+
+  const today = new Date()
+    .toISOString()
+    .split("T")[0];
+
+  const todayTasks = data.tasks.filter(
+    (task) => task.date === today
+  );
+
+  return (
+    <main className="min-h-screen bg-slate-950 text-white">
+      <div className="mx-auto max-w-6xl px-4 py-8">
+
+        {/* Header */}
+        <header className="mb-8">
+          <p className="text-sm text-slate-400">
+            Your personal competition
+          </p>
+
+          <h1 className="mt-1 text-3xl font-bold">
+            Let's beat yesterday. 👋
+          </h1>
+
+          <p className="mt-2 text-slate-400">
+            Focus on becoming 1% better today.
+          </p>
+        </header>
+
+        {/* Stats */}
+        <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+
+          <StatsCard
+            title="Total XP"
+            value={data.stats.xp}
+            subtitle="Keep earning"
+            icon="⚡"
+          />
+
+          <StatsCard
+            title="Level"
+            value={data.stats.level}
+            subtitle="Your current level"
+            icon="🎮"
+          />
+
+          <StatsCard
+            title="Current Streak"
+            value={data.stats.currentStreak}
+            subtitle="Days in a row"
+            icon="🔥"
+          />
+
+          <StatsCard
+            title="Focus Time"
+            value={`${data.stats.totalFocusMinutes}m`}
+            subtitle="Total focused time"
+            icon="⏱️"
+          />
+
+        </section>
+
+        {/* Main Grid */}
+        <section className="mt-6 grid gap-6 lg:grid-cols-2">
+
+          <TodayTasks
+            tasks={todayTasks}
+          />
+
+          <GoalOverview
+            goals={data.goals}
+          />
+
+        </section>
+
+        {/* Focus */}
+        <section className="mt-6">
+          <FocusOverview
+            totalMinutes={data.stats.totalFocusMinutes}
+          />
+        </section>
+
+        {/* Career */}
+        <div className="mt-6">
+          <CareerOverview
+            codingMinutes={data.career.codingMinutes}
+            projectsCompleted={data.career.projectsCompleted}
+            skillsImproved={data.career.skillsImproved}
+          />
+        </div>
+
+        {/* Motivation */}
+        <section className="mt-6 rounded-3xl border border-slate-800 bg-slate-900 p-6 text-center">
+
+          <p className="text-lg font-semibold">
+            "You don't need to beat everyone."
+          </p>
+
+          <p className="mt-2 text-sm text-slate-500">
+            Just beat the version of yourself
+            from yesterday.
+          </p>
+
+        </section>
+
+      </div>
+    </main>
   );
 }

@@ -1,0 +1,103 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+model goal {
+  id          Int       @id @default(autoincrement())
+  title       String
+  description String?
+  category    String
+  progress    Int       @default(0)
+  target      Int       @default(100)
+  deadline    DateTime?
+  createdAt   DateTime  @default(now())
+  userId      Int
+  user        user      @relation(fields: [userId], references: [id], onDelete: Cascade, map: "Goal_userId_fkey")
+
+  @@index([userId], map: "Goal_userId_fkey")
+}
+
+model task {
+  id        Int      @id @default(autoincrement())
+  title     String
+  category  String
+  completed Boolean  @default(false)
+  xp        Int      @default(0)
+  date      DateTime
+  createdAt DateTime @default(now())
+  userId    Int
+  user      user     @relation(fields: [userId], references: [id], onDelete: Cascade, map: "Task_userId_fkey")
+
+  @@index([userId], map: "Task_userId_fkey")
+}
+
+model user {
+  id              Int               @id @default(autoincrement())
+  name            String?
+  email           String            @unique(map: "User_email_key")
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  goal            goal[]
+  task            task[]
+  userachievement userachievement[]
+  userstats       userstats?
+  englishpractice englishpractice[]
+  careerprogress careerprogress[]
+}
+
+model userachievement {
+  id          Int       @id @default(autoincrement())
+  title       String
+  description String
+  icon        String
+  unlocked    Boolean   @default(false)
+  unlockedAt  DateTime?
+  userId      Int
+  user        user      @relation(fields: [userId], references: [id], onDelete: Cascade, map: "UserAchievement_userId_fkey")
+
+  @@index([userId], map: "UserAchievement_userId_fkey")
+}
+
+model userstats {
+  id                Int       @id @default(autoincrement())
+  xp                Int       @default(0)
+  level             Int       @default(1)
+  currentStreak     Int       @default(0)
+  longestStreak     Int       @default(0)
+  completedTasks    Int       @default(0)
+  totalFocusMinutes Int       @default(0)
+  lastActiveDate    DateTime?
+  userId            Int       @unique(map: "UserStats_userId_key")
+  user              user      @relation(fields: [userId], references: [id], onDelete: Cascade, map: "UserStats_userId_fkey")
+}
+model englishpractice {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  activity    String
+  minutes     Int      @default(0)
+  description String?
+  createdAt   DateTime @default(now())
+
+  user user @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+model careerprogress {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  skill       String
+  category    String
+  progress    Int      @default(0)
+  target      Int      @default(100)
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user user @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
