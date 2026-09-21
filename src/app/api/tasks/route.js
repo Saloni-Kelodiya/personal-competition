@@ -1,68 +1,41 @@
 import { prisma } from "@/lib/prisma";
+import { getCurrentUserId } from "@/lib/auth";
 import { NextResponse } from "next/server";
 
-// GET - user's tasks
-export async function GET(request) {
+export async function GET() {
   try {
-    const { searchParams } = new URL(request.url);
-
-    const userId = Number(searchParams.get("userId"));
+    const userId = await getCurrentUserId();
 
     if (!userId) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "userId is required",
-        },
-        { status: 400 }
-      );
+      return NextResponse.json({ success: false, error: "Not authenticated" }, { status: 401 });
     }
 
     const tasks = await prisma.task.findMany({
-      where: {
-        userId,
-      },
-      orderBy: {
-        date: "desc",
-      },
+      where: { userId },
+      orderBy: { date: "desc" },
     });
 
-    return NextResponse.json({
-      success: true,
-      data: tasks,
-    });
+    return NextResponse.json({ success: true, data: tasks });
   } catch (error) {
     console.error("GET TASKS ERROR:", error);
-
-    return NextResponse.json(
-      {
-        success: false,
-        error: "Failed to fetch tasks",
-      },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: false, error: "Failed to fetch tasks" }, { status: 500 });
   }
 }
 
-// POST - create a new task
 export async function POST(request) {
   try {
+    const userId = await getCurrentUserId();
+
+    if (!userId) {
+      return NextResponse.json({ success: false, error: "Not authenticated" }, { status: 401 });
+    }
+
     const body = await request.json();
+    const { title, category, xp, date } = body;
 
-    const {
-      title,
-      category,
-      xp,
-      date,
-      userId,
-    } = body;
-
-    if (!title || !category || !userId || !date) {
+    if (!title || !category || !date) {
       return NextResponse.json(
-        {
-          success: false,
-          error: "title, category, date and userId are required",
-        },
+        { success: false, error: "title, category and date are required" },
         { status: 400 }
       );
     }
@@ -73,26 +46,13 @@ export async function POST(request) {
         category,
         xp: xp !== undefined ? Number(xp) : 0,
         date: new Date(date),
-        userId: Number(userId),
+        userId,
       },
     });
 
-    return NextResponse.json(
-      {
-        success: true,
-        data: task,
-      },
-      { status: 201 }
-    );
+    return NextResponse.json({ success: true, data: task }, { status: 201 });
   } catch (error) {
     console.error("CREATE TASK ERROR:", error);
-
-    return NextResponse.json(
-      {
-        success: false,
-        error: "Failed to create task",
-      },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: false, error: "Failed to create task" }, { status: 500 });
   }
 }
