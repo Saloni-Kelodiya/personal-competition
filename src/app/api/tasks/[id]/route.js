@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
+import { updateStreak } from "@/lib/streak";
 
 export async function PUT(request, { params }) {
   try {
@@ -124,56 +125,14 @@ export async function PUT(request, { params }) {
         // STREAK SYSTEM
         // --------------------------------
 
-        const currentDay =
-          completionDate.toISOString().slice(0, 10);
-
-        let currentStreak = currentStats.currentStreak;
-
-        let longestStreak = currentStats.longestStreak;
-
-        if (!currentStats.lastActiveDate) {
-          // First activity
-          currentStreak = 1;
-        } else {
-          const lastActiveDay =
-            currentStats.lastActiveDate
-              .toISOString()
-              .slice(0, 10);
-
-          // Same day
-          if (lastActiveDay === currentDay) {
-            currentStreak = currentStats.currentStreak;
-          } else {
-            const lastDate = new Date(
-              `${lastActiveDay}T00:00:00Z`
-            );
-
-            const currentDate = new Date(
-              `${currentDay}T00:00:00Z`
-            );
-
-            const difference =
-              Math.round(
-                (currentDate - lastDate) /
-                  (1000 * 60 * 60 * 24)
-              );
-
-            // Consecutive day
-            if (difference === 1) {
-              currentStreak =
-                currentStats.currentStreak + 1;
-            } else {
-              // Streak broken
-              currentStreak = 1;
-            }
-          }
-        }
-
-        // Longest streak
-        longestStreak = Math.max(
-          longestStreak,
-          currentStreak
+        const streak = updateStreak(
+          currentStats.currentStreak,
+          currentStats.longestStreak,
+          currentStats.lastActiveDate
         );
+
+        const currentStreak = streak.currentStreak;
+        const longestStreak = streak.longestStreak;
 
         // --------------------------------
         // UPDATE STATS
