@@ -1,36 +1,35 @@
-function getDateOnly(date: Date) {
-  return new Date(
-    date.getFullYear(),
-    date.getMonth(),
-    date.getDate()
+function getIndiaDate(date: Date) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+
+  const values = Object.fromEntries(
+    parts.map((part) => [part.type, part.value])
   );
+
+  return `${values.year}-${values.month}-${values.day}`;
 }
 
-function differenceInDays(
-  firstDate: string,
-  secondDate: string
-) {
-  const first = getDateOnly(new Date(firstDate));
-  const second = getDateOnly(new Date(secondDate));
-
-  const difference =
-    second.getTime() - first.getTime();
+function differenceInDays(firstDate: string, secondDate: string) {
+  const first = new Date(`${firstDate}T00:00:00Z`);
+  const second = new Date(`${secondDate}T00:00:00Z`);
 
   return Math.round(
-    difference / (1000 * 60 * 60 * 24)
+    (second.getTime() - first.getTime()) /
+      (1000 * 60 * 60 * 24)
   );
 }
 
 export function updateStreak(
   currentStreak: number,
   longestStreak: number,
-  lastActiveDate?: string
+  lastActiveDate?: string | Date
 ) {
-  const today = new Date()
-    .toISOString()
-    .split("T")[0];
+  const today = getIndiaDate(new Date());
 
-  // First activity
   if (!lastActiveDate) {
     return {
       currentStreak: 1,
@@ -39,8 +38,12 @@ export function updateStreak(
     };
   }
 
+  const lastActiveDay = getIndiaDate(
+    new Date(lastActiveDate)
+  );
+
   const days = differenceInDays(
-    lastActiveDate,
+    lastActiveDay,
     today
   );
 
@@ -49,20 +52,17 @@ export function updateStreak(
     return {
       currentStreak,
       longestStreak,
-      lastActiveDate,
+      lastActiveDate: lastActiveDate,
     };
   }
 
-  // Active yesterday
+  // Active on the previous day
   if (days === 1) {
     const newStreak = currentStreak + 1;
 
     return {
       currentStreak: newStreak,
-      longestStreak: Math.max(
-        longestStreak,
-        newStreak
-      ),
+      longestStreak: Math.max(longestStreak, newStreak),
       lastActiveDate: today,
     };
   }
@@ -70,10 +70,7 @@ export function updateStreak(
   // Missed one or more days
   return {
     currentStreak: 1,
-    longestStreak: Math.max(
-      longestStreak,
-      1
-    ),
+    longestStreak: Math.max(longestStreak, 1),
     lastActiveDate: today,
   };
 }
