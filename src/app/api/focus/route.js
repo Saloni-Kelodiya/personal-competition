@@ -1,97 +1,40 @@
 import { prisma } from "@/lib/prisma";
+import { getCurrentUserId } from "@/lib/auth";
 import { NextResponse } from "next/server";
 
-// POST - Save focus session
-export async function POST(request) {
+const FOCUS_XP = 5;
+const FOCUS_MINUTES = 5;
+
+export async function POST() {
   try {
-    const body = await request.json();
+    const userId = await getCurrentUserId();
 
-    const userId = Number(body.userId);
-    const minutes = Number(body.minutes);
-
-    if (!userId || !minutes || minutes <= 0) {
+    if (!userId) {
       return NextResponse.json(
-        {
-          success: false,
-          error: "Valid userId and minutes are required",
-        },
-        { status: 400 }
+        { success: false, error: "Not authenticated" },
+        { status: 401 }
       );
     }
 
     const stats = await prisma.userstats.upsert({
-      where: {
-        userId,
-      },
+      where: { userId },
       update: {
-        totalFocusMinutes: {
-          increment: minutes,
-        },
+        xp: { increment: FOCUS_XP },
+        totalFocusMinutes: { increment: FOCUS_MINUTES },
       },
       create: {
         userId,
-        totalFocusMinutes: minutes,
+        xp: FOCUS_XP,
+        level: 1,
+        totalFocusMinutes: FOCUS_MINUTES,
       },
     });
 
-    return NextResponse.json({
-      success: true,
-      message: "Focus session saved successfully",
-      data: stats,
-    });
+    return NextResponse.json({ success: true, data: stats });
   } catch (error) {
-    console.error("SAVE FOCUS ERROR:", error);
-
+    console.error("COMPLETE FOCUS SESSION ERROR:", error);
     return NextResponse.json(
-      {
-        success: false,
-        error: "Failed to save focus session",
-      },
-      { status: 500 }
-    );
-  }
-}
-
-// GET - Get focus minutes
-export async function GET(request) {
-  try {
-    const { searchParams } = new URL(request.url);
-
-    const userId = Number(searchParams.get("userId"));
-
-    if (!userId) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "userId is required",
-        },
-        { status: 400 }
-      );
-    }
-
-    const stats = await prisma.userstats.findUnique({
-      where: {
-        userId,
-      },
-      select: {
-        totalFocusMinutes: true,
-      },
-    });
-
-    return NextResponse.json({
-      success: true,
-      data: {
-        totalFocusMinutes: stats?.totalFocusMinutes || 0,
-      },
-    });
-  } catch (error) {
-    console.error("GET FOCUS ERROR:", error);
-
-    return NextResponse.json(
-      {
-        success: false,
-        error: "Failed to fetch focus minutes",
-      },
+      { success: false, error: "Failed to save focus session" },
       { status: 500 }
     );
   }
