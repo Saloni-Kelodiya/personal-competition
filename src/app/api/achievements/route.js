@@ -1,44 +1,41 @@
 import { prisma } from "@/lib/prisma";
+import { getCurrentUserId } from "@/lib/auth";
 import { NextResponse } from "next/server";
 
-export async function GET(request) {
+const defaultAchievements = [
+  { title: "First Step", description: "Complete your first task", icon: "🎯" },
+  { title: "100 XP", description: "Reach 100 XP", icon: "⭐" },
+  { title: "7 Day Streak", description: "Maintain a 7 day streak", icon: "🔥" },
+  { title: "10 Tasks", description: "Complete 10 tasks", icon: "🏆" },
+];
+
+export async function GET() {
   try {
-    const { searchParams } = new URL(request.url);
-
-    const userId = Number(searchParams.get("userId"));
-
+    const userId = await getCurrentUserId();
     if (!userId) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "userId is required",
-        },
-        { status: 400 }
-      );
+      return NextResponse.json({ success: false, error: "Not authenticated" }, { status: 401 });
     }
 
-    const achievements =
-      await prisma.userachievement.findMany({
-        where: {
-          userId,
-        },
-        orderBy: {
-          id: "asc",
-        },
+    for (const achievement of defaultAchievements) {
+      const existing = await prisma.userachievement.findFirst({
+        where: { userId, title: achievement.title },
       });
 
-    return NextResponse.json({
-      success: true,
-      data: achievements,
+      if (!existing) {
+        await prisma.userachievement.create({ data: { ...achievement, userId } });
+      }
+    }
+
+    const achievements = await prisma.userachievement.findMany({
+      where: { userId },
+      orderBy: { id: "asc" },
     });
+
+    return NextResponse.json({ success: true, data: achievements });
   } catch (error) {
     console.error("GET ACHIEVEMENTS ERROR:", error);
-
     return NextResponse.json(
-      {
-        success: false,
-        error: "Failed to fetch achievements",
-      },
+      { success: false, error: "Failed to fetch achievements" },
       { status: 500 }
     );
   }
