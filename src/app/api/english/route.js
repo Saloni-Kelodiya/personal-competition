@@ -1,66 +1,34 @@
-
 import { prisma } from "@/lib/prisma";
+import { getCurrentUserId } from "@/lib/auth";
 import { NextResponse } from "next/server";
 
-// GET - English practice records
-export async function GET(request) {
+export async function GET() {
   try {
-    const { searchParams } = new URL(request.url);
-
-    const userId = Number(searchParams.get("userId"));
-
-    if (!userId) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "userId is required",
-        },
-        { status: 400 }
-      );
-    }
+    const userId = await getCurrentUserId();
+    if (!userId) return NextResponse.json({ success: false, error: "Not authenticated" }, { status: 401 });
 
     const records = await prisma.englishpractice.findMany({
-      where: {
-        userId,
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
+      where: { userId },
+      orderBy: { createdAt: "desc" },
     });
 
-    return NextResponse.json({
-      success: true,
-      data: records,
-    });
+    return NextResponse.json({ success: true, data: records });
   } catch (error) {
     console.error("GET ENGLISH ERROR:", error);
-
-    return NextResponse.json(
-      {
-        success: false,
-        error: "Failed to fetch English records",
-      },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: false, error: "Failed to fetch English records" }, { status: 500 });
   }
 }
 
-// POST - Add English practice
 export async function POST(request) {
   try {
-    const body = await request.json();
+    const userId = await getCurrentUserId();
+    if (!userId) return NextResponse.json({ success: false, error: "Not authenticated" }, { status: 401 });
 
-    const userId = Number(body.userId);
+    const body = await request.json();
     const minutes = Number(body.minutes);
 
-    if (!userId || !body.activity || !minutes || minutes <= 0) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "userId, activity and valid minutes are required",
-        },
-        { status: 400 }
-      );
+    if (!body.activity || !Number.isFinite(minutes) || minutes <= 0) {
+      return NextResponse.json({ success: false, error: "activity and valid minutes are required" }, { status: 400 });
     }
 
     const record = await prisma.englishpractice.create({
@@ -72,22 +40,9 @@ export async function POST(request) {
       },
     });
 
-    return NextResponse.json(
-      {
-        success: true,
-        data: record,
-      },
-      { status: 201 }
-    );
+    return NextResponse.json({ success: true, data: record }, { status: 201 });
   } catch (error) {
     console.error("CREATE ENGLISH ERROR:", error);
-
-    return NextResponse.json(
-      {
-        success: false,
-        error: "Failed to save English practice",
-      },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: false, error: "Failed to save English practice" }, { status: 500 });
   }
 }
