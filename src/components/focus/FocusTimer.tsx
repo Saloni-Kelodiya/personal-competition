@@ -4,22 +4,23 @@ import { useEffect, useState } from "react";
 
 const FOCUS_DURATION = 5 * 60;
 const FOCUS_XP = 5;
+const FOCUS_MINUTES = 5;
 
 export default function FocusTimer() {
   const [timeLeft, setTimeLeft] = useState(FOCUS_DURATION);
   const [isRunning, setIsRunning] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
 
   useEffect(() => {
     if (!isRunning) return;
 
-    const timer = setInterval(() => {
+    const timer = window.setInterval(() => {
       setTimeLeft((currentTime) => {
         if (currentTime <= 1) {
-          clearInterval(timer);
+          window.clearInterval(timer);
           setIsRunning(false);
-          void saveFocusSession();
           return 0;
         }
 
@@ -27,33 +28,57 @@ export default function FocusTimer() {
       });
     }, 1000);
 
-    return () => clearInterval(timer);
+    return () => window.clearInterval(timer);
   }, [isRunning]);
 
-  const saveFocusSession = async () => {
-    setIsSaving(true);
-    setMessage("");
+  // Save only after the timer has actually reached 00:00.
+  useEffect(() => {
+    if (timeLeft !== 0) return;
 
-    try {
-      const response = await fetch("/api/focus", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-      });
+    let cancelled = false;
 
-      const result = await response.json();
+    async function saveFocusSession() {
+      setIsSaving(true);
+      setMessage("");
+      setError("");
 
-      if (!response.ok || !result.success) {
-        throw new Error(result.error || "Failed to save focus session");
+      try {
+        const response = await fetch("/api/focus", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ minutes: FOCUS_MINUTES }),
+        });
+
+        const result = await response.json();
+
+        if (!response.ok || !result.success) {
+          throw new Error(result.error || "Failed to save focus session");
+        }
+
+        if (!cancelled) {
+          setMessage("Session saved! +5 XP and +5 focus minutes 🎉");
+        }
+      } catch (error) {
+        console.error("FOCUS SAVE ERROR:", error);
+        if (!cancelled) {
+          setError(
+            error instanceof Error
+              ? error.message
+              : "Could not save session"
+          );
+        }
+      } finally {
+        if (!cancelled) setIsSaving(false);
       }
-
-      setMessage("Session saved! +5 XP and +5 focus minutes 🎉");
-    } catch (error) {
-      console.error("FOCUS SAVE ERROR:", error);
-      setMessage(error instanceof Error ? error.message : "Could not save session");
-    } finally {
-      setIsSaving(false);
     }
-  };
+
+    void saveFocusSession();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [timeLeft]);
 
   const minutes = Math.floor(timeLeft / 60);
   const seconds = timeLeft % 60;
@@ -62,6 +87,7 @@ export default function FocusTimer() {
     setIsRunning(false);
     setTimeLeft(FOCUS_DURATION);
     setMessage("");
+    setError("");
   };
 
   return (
@@ -72,7 +98,9 @@ export default function FocusTimer() {
         </div>
 
         <h2 className="mt-5 text-2xl font-bold">Focus Session</h2>
-        <p className="mt-2 text-sm text-slate-400">Stay focused and make progress.</p>
+        <p className="mt-2 text-sm text-slate-400">
+          Stay focused and make progress.
+        </p>
       </div>
 
       <div className="mx-auto mt-8 flex h-64 w-64 items-center justify-center rounded-full border-8 border-slate-800 sm:h-72 sm:w-72">
@@ -83,7 +111,7 @@ export default function FocusTimer() {
             {String(seconds).padStart(2, "0")}
           </p>
           <p className="mt-3 text-sm text-slate-500">
-            {isRunning ? "Stay focused..." : "Ready to focus?"}
+            {isRunning ? "Stay focused..." : timeLeft === 0 ? "Completed!" : "Ready to focus?"}
           </p>
         </div>
       </div>
@@ -91,9 +119,9 @@ export default function FocusTimer() {
       <div className="mx-auto mt-8 flex max-w-md gap-3">
         <button
           type="button"
-          disabled={isSaving}
+          disabled={isSaving || timeLeft === 0}
           onClick={() => setIsRunning((running) => !running)}
-          className="flex-1 rounded-xl bg-white px-5 py-3 font-semibold text-slate-950 transition hover:bg-slate-200 disabled:opacity-50"
+          className="flex-1 rounded-xl bg-white px-5 py-3 font-semibold text-slate-950 transition hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {isRunning ? "Pause" : "Start"}
         </button>
@@ -101,7 +129,8 @@ export default function FocusTimer() {
         <button
           type="button"
           onClick={resetTimer}
-          className="flex-1 rounded-xl border border-slate-700 px-5 py-3 font-semibold transition hover:bg-slate-800"
+          disabled={isSaving}
+          className="flex-1 rounded-xl border border-slate-700 px-5 py-3 font-semibold transition hover:bg-slate-800 disabled:opacity-50"
         >
           Reset
         </button>
@@ -109,8 +138,12 @@ export default function FocusTimer() {
 
       <div className="mx-auto mt-6 max-w-md rounded-2xl bg-slate-800/70 p-4 text-center">
         <p className="text-sm text-slate-400">Complete this session</p>
-        <p className="mt-1 font-semibold">⭐ +{FOCUS_XP} XP • ⏱️ +5 minutes</p>
+        <p className="mt-1 font-semibold">
+          ⭐ +{FOCUS_XP} XP • ⏱️ +{FOCUS_MINUTES} minutes
+        </p>
+        {isSaving && <p className="mt-3 text-sm text-slate-400">Saving session...</p>}
         {message && <p className="mt-3 text-sm text-emerald-400">{message}</p>}
+        {error && <p className="mt-3 text-sm text-red-400">{error}</p>}
       </div>
     </div>
   );
