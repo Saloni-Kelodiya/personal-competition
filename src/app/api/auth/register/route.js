@@ -2,6 +2,13 @@ import { prisma } from "@/lib/prisma";
 import { hashPassword, setSessionCookie } from "@/lib/auth";
 import { NextResponse } from "next/server";
 
+const defaultAchievements = [
+  { title: "First Step", description: "Complete your first task", icon: "🎯" },
+  { title: "100 XP", description: "Reach 100 XP", icon: "⭐" },
+  { title: "7 Day Streak", description: "Maintain a 7 day streak", icon: "🔥" },
+  { title: "10 Tasks", description: "Complete 10 tasks", icon: "🏆" },
+];
+
 export async function POST(request) {
   try {
     const body = await request.json();
@@ -24,9 +31,7 @@ export async function POST(request) {
       );
     }
 
-    const existingUser = await prisma.user.findUnique({
-      where: { email },
-    });
+    const existingUser = await prisma.user.findUnique({ where: { email } });
 
     if (existingUser) {
       return NextResponse.json(
@@ -40,23 +45,17 @@ export async function POST(request) {
         name: name || null,
         email,
         passwordHash: hashPassword(password),
+        userstats: { create: {} },
+        userachievement: { create: defaultAchievements },
       },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-      },
+      select: { id: true, name: true, email: true },
     });
 
     await setSessionCookie(user.id);
 
-    return NextResponse.json(
-      { success: true, data: user },
-      { status: 201 }
-    );
+    return NextResponse.json({ success: true, data: user }, { status: 201 });
   } catch (error) {
     console.error("REGISTER ERROR:", error);
-
     return NextResponse.json(
       { success: false, error: "Failed to create account" },
       { status: 500 }
